@@ -1,10 +1,16 @@
 import { Client as DiscordClient, Collection, SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 import { AudioResource } from "@discordjs/voice";
 
-class Queue<T> {
+export class Queue<T> {
     private items: T[] = [];
 
-    constructor(capacity: number = Infinity) {}
+    getItems(): T[] {
+        return this.items;
+    }
+
+    isEmpty(): boolean {
+        return this.items.length === 0;
+    }
 
     enqueue(item: T) {
         this.items.push(item);
@@ -13,6 +19,10 @@ class Queue<T> {
     dequeue(): T | undefined {
         return this.items.shift();
     }
+
+    clear(): void {
+        this.items = [];
+    }
 }
 
 export interface Command {
@@ -20,10 +30,22 @@ export interface Command {
     execute: (interaction: ChatInputCommandInteraction) => void;
 }
 
+export class GuildData {
+    musicQueue = new Queue<AudioContent>();
+}
+
+export interface AudioContent {
+    name: string;
+    content: AudioResource<any>;
+}
+
 export class Client extends DiscordClient {
     commands = new Collection<string, Command>();
 
-    music = {
-        queue: new Queue<AudioResource>(),
-    }
+    guildData = new Collection<string, GuildData>();
+}
+
+export interface SearchResult {
+    title: string;
+    url:   string;
 }
