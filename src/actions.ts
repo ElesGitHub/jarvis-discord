@@ -9,7 +9,8 @@ import {
     VoiceConnectionStatus,
 } from "@discordjs/voice";
 
-import { Client, GuildData, Queue, AudioContent } from "./types";
+import { Client, GuildData, Queue } from "./types";
+import { createAudioResourceFromYoutube } from "./utils";
 
 export function joinVoiceChannel(channel: VoiceBasedChannel) {
     return discJoinVoiceChannel({
@@ -25,7 +26,7 @@ export function getCurrentVoiceChannel(guild: Guild) {
     return guild.members.me?.voice.channel;
 }
 
-export function getQueue(client: Client, guildId: string): Queue<AudioContent> {
+export function getQueue(client: Client, guildId: string) {
     let guildData = client.guildData.get(guildId);
     if (!guildData) {
         guildData = new GuildData();
@@ -36,7 +37,6 @@ export function getQueue(client: Client, guildId: string): Queue<AudioContent> {
 }
  export async function playQueue(client: Client, guildId: string): Promise<boolean> {
     let guildData = client.guildData.get(guildId);
-
     if (!guildData || guildData.musicQueue.isEmpty()) return false;
     
     const queue = guildData.musicQueue;
@@ -46,17 +46,34 @@ export function getQueue(client: Client, guildId: string): Queue<AudioContent> {
     await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
 
     const player = createAudioPlayer();
-    const subscription = connection.subscribe(player);
+    connection.subscribe(player);
 
-    const item = queue.dequeue();
-    if (item) player.play(item.content);
-    player.on("stateChange", (oldState: AudioPlayerState, newState: AudioPlayerState) => {
-        if (oldState.status === AudioPlayerStatus.Playing &&
-            newState.status === AudioPlayerStatus.Idle) {
-            const nextItem = queue.dequeue();
-            if (nextItem) player.play(nextItem.content);
+    async function playNext() {
+        if (queue.isEmpty()) {
+            // TODO Figure out what to do here
+            return;
         }
+        const { url } = queue.dequeue()!;
+        const resource = await createAudioResourceFromYoutube(url);
+        if (resource) player.play(resource);
+    }
+
+    player.on(AudioPlayerStatus.Idle, () => {
+        playNext().catch(console.error);
     });
 
+    await playNext();
     return true;
+
+    //const item = queue.dequeue();
+    //if (item) player.play(item.content);
+    //player.on("stateChange", (oldState: AudioPlayerState, newState: AudioPlayerState) => {
+    //    if (oldState.status === AudioPlayerStatus.Playing &&
+    //        newState.status === AudioPlayerStatus.Idle) {
+    //        const nextItem = queue.dequeue();
+    //        if (nextItem) player.play(nextItem.content);
+    //    }
+    //});
+
+    //return true;
  }

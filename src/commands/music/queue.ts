@@ -48,15 +48,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         if (!query) return;
 
         const result = (await searchYoutube(query))[0];
-        const resource = await createAudioResourceFromYoutube(result.url);
-        if (!resource) return;
-
-        const audioContent = {
-            name: result.title,
-            content: resource,
-        };
-
-        queue.enqueue(audioContent);
+        queue.enqueue(result);
         interaction.reply(`Successfully added "${query}" to the queue.`);
         break;
 
@@ -67,7 +59,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             return;
         }
         const message = contents
-            .map((content, index) => `${index + 1}. ${content.name}`)
+            .map((content, index) => `${index + 1}. ${content.title}`)
             .join("\n");
         await interaction.reply(message);
         break;

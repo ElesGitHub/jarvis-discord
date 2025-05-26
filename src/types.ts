@@ -31,12 +31,7 @@ export interface Command {
 }
 
 export class GuildData {
-    musicQueue = new Queue<AudioContent>();
-}
-
-export interface AudioContent {
-    name: string;
-    content: AudioResource<any>;
+    musicQueue = new Queue<SearchResult>();
 }
 
 export class Client extends DiscordClient {

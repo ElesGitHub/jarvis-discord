@@ -8,6 +8,11 @@ import { spawn } from "node:child_process";
 import { Command, SearchResult } from "./types";
 
 const COMMANDS_PATH = path.join(__dirname, "./commands");
+const CACHE_DIR     = path.join(__dirname, "../resources/cache");
+
+if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
 
 dotenv.config();
 
@@ -91,7 +96,7 @@ export async function createAudioResourceFromYoutube(url: string) {
 
     const ytdlp = spawn(
         "yt-dlp",
-        ["-f", "bestaudio", "-o", "-", url],
+        ["--cache-dir", CACHE_DIR, "-f", "bestaudio", "-o", "-", url],
         { stdio: ["ignore", "pipe", "ignore"] }
     );
 
