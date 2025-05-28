@@ -1,8 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 
 import { Queue, Client } from "../../types";
-import { getQueue } from "../../actions";
-import { searchYoutube, createAudioResourceFromYoutube } from "../../utils";
+import { getGuildData, searchYoutube } from "../../utils";
 
 export const data = new SlashCommandBuilder()
     .setName("queue")
@@ -11,6 +10,17 @@ export const data = new SlashCommandBuilder()
         return subcommand
             .setName("list")
             .setDescription("Lists all songs in the queue.");
+    })
+    .addSubcommand((subcommand) => {
+        return subcommand
+            .setName("remove")
+            .setDescription("Removes an item from the queue.")
+            .addNumberOption(numberOption => {
+                return numberOption
+                    .setName("index")
+                    .setDescription("The position of the song you want to remove.")
+                    .setRequired(true);
+            });
     })
     .addSubcommand((subcommand) => {
         return subcommand
@@ -33,7 +43,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guild) return;
 
     const client = interaction.client as Client;
-    const queue = getQueue(client, interaction.guild.id);
+
+    const queue = getGuildData(client, interaction.guild.id).musicQueue;
 
     const subcommand = interaction.options.getSubcommand();
 
@@ -53,15 +64,22 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         break;
 
     case "list":
-        const contents = queue.getItems();
-        if (contents.length === 0) {
+        if (queue.getSize() === 0) {
             await interaction.reply("Queue is empty.");
             return;
         }
-        const message = contents
+        const message = queue
+            .getItems()
             .map((content, index) => `${index + 1}. ${content.title}`)
             .join("\n");
         await interaction.reply(message);
         break;
+    case "remove":
+        const index = interaction.options.getNumber("index");
+        if (!index) return;
+
+        const removed = queue.removeAt(index - 1);
+        if (!removed) await interaction.reply("Please select a valid index.");
+        else          await interaction.reply(`Removed "${removed.title}" from the queue`);
     }
 }

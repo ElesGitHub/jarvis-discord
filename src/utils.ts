@@ -1,11 +1,11 @@
-import { Collection } from "discord.js";
+import { Collection, Guild } from "discord.js";
 import { createAudioResource, StreamType } from "@discordjs/voice";
 import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
 import { spawn } from "node:child_process";
 
-import { Command, SearchResult } from "./types";
+import { Command, SearchResult, GuildData, Client, AudioStream } from "./types";
 
 const COMMANDS_PATH = path.join(__dirname, "./commands");
 const CACHE_DIR     = path.join(__dirname, "../resources/cache");
@@ -70,6 +70,20 @@ export async function searchYoutube(query: string): Promise<SearchResult[]> {
                });
 }
 
+export function getCurrentVoiceChannel(guild: Guild) {
+    return guild.members.me?.voice.channel;
+}
+
+export function getGuildData(client: Client, guildId: string) {
+    let guildData = client.guildData.get(guildId);
+    if (!guildData) {
+        guildData = new GuildData();
+        client.guildData.set(guildId, guildData);
+    }
+
+    return guildData;
+}
+
 export async function isValidYoutubeURL(url: string): Promise<boolean> {
     // if valid yt url, first group is video id
     const regex = /(?:https?:\/\/(?:www\.)?youtube\.com\/(?:[^\/]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=))([^"&?\/\s]{11})/;
@@ -91,7 +105,7 @@ export async function isValidYoutubeURL(url: string): Promise<boolean> {
     return true;
 }
 
-export async function createAudioResourceFromYoutube(url: string) {
+export async function createAudioStreamFromYoutube(url: string): Promise<AudioStream | null> {
     if (!await isValidYoutubeURL(url)) return null;
 
     const ytdlp = spawn(
@@ -107,7 +121,22 @@ export async function createAudioResourceFromYoutube(url: string) {
     );
 
     ytdlp.stdout.pipe(ffmpeg.stdin);
-    return createAudioResource(ffmpeg.stdout, {
-        inputType: StreamType.Raw,
+
+    ffmpeg.on("close", () => {
+        ytdlp.kill();
+        ffmpeg.kill();
     });
+
+    ffmpeg.stdin.on("error", (err: any) => {
+        if (err.code === "EPIPE") console.error("Pichula");
+
+        console.error(err);
+    });
+
+    return new AudioStream(
+        [ytdlp, ffmpeg],
+        createAudioResource(ffmpeg.stdout, {
+            inputType: StreamType.Raw,
+        })
+    );
 }

@@ -10,7 +10,7 @@ import {
 } from "@discordjs/voice";
 
 import { Client, GuildData, Queue } from "./types";
-import { createAudioResourceFromYoutube } from "./utils";
+import { createAudioStreamFromYoutube, getGuildData } from "./utils";
 
 export function joinVoiceChannel(channel: VoiceBasedChannel) {
     return discJoinVoiceChannel({
@@ -22,21 +22,21 @@ export function joinVoiceChannel(channel: VoiceBasedChannel) {
     });
 }
 
-export function getCurrentVoiceChannel(guild: Guild) {
-    return guild.members.me?.voice.channel;
-}
+export function leaveVoiceChannel(client: Client, guildId: string) {
+    
+    const connection = getVoiceConnection(guildId);
+    if (!connection) return;
 
-export function getQueue(client: Client, guildId: string) {
-    let guildData = client.guildData.get(guildId);
-    if (!guildData) {
-        guildData = new GuildData();
-        client.guildData.set(guildId, guildData);
+    const current = getGuildData(client, guildId).currentSong;
+    if (current) {
+        current.stream.kill();
     }
 
-    return guildData.musicQueue;
+    connection.destroy();
 }
- export async function playQueue(client: Client, guildId: string): Promise<boolean> {
-    let guildData = client.guildData.get(guildId);
+
+export async function playQueue(client: Client, guildId: string): Promise<boolean> {
+    const guildData = getGuildData(client, guildId);
     if (!guildData || guildData.musicQueue.isEmpty()) return false;
     
     const queue = guildData.musicQueue;
@@ -47,18 +47,26 @@ export function getQueue(client: Client, guildId: string) {
 
     const player = createAudioPlayer();
     connection.subscribe(player);
+    guildData.player = player;
 
     async function playNext() {
         if (queue.isEmpty()) {
-            // TODO Figure out what to do here
+            guildData.currentSong = null;
             return;
         }
-        const { url } = queue.dequeue()!;
-        const resource = await createAudioResourceFromYoutube(url);
-        if (resource) player.play(resource);
+        const next = queue.dequeue()!;
+        const stream = await createAudioStreamFromYoutube(next.url);
+        if (stream) {
+            player.play(stream.resource);
+            guildData.currentSong = {
+                ...next,
+                stream,
+            };
+        }
     }
 
     player.on(AudioPlayerStatus.Idle, () => {
+        if (guildData.currentSong) guildData.currentSong.stream.kill();
         playNext().catch(console.error);
     });
 
@@ -76,4 +84,4 @@ export function getQueue(client: Client, guildId: string) {
     //});
 
     //return true;
- }
+}

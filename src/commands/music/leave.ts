@@ -2,7 +2,9 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, GuildMember } from "discord.js";
 import { getVoiceConnection } from "@discordjs/voice";
 
-import { getCurrentVoiceChannel } from "../../actions";
+import { getCurrentVoiceChannel } from "../../utils";
+import { leaveVoiceChannel } from "../../actions";
+import { Client } from "../../types";
 
 export const data = new SlashCommandBuilder()
     .setName("leave")
@@ -23,7 +25,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         await interaction.reply("You must be in the same channel as me to kick me.");
     }
 
-    const connection = getVoiceConnection(interaction.guild.id);
-    if (connection) connection.destroy();
+    const client = interaction.client as Client;
+
+    leaveVoiceChannel(client, interaction.guild.id);
     interaction.reply("Succesfully left the voice channel.");
 }
